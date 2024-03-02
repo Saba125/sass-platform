@@ -11,21 +11,18 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import {
-  ChatCompletionAssistantMessageParam,
-  ChatCompletionMessageParam,
-  CreateChatCompletionRequestMessage,
-} from "openai/resources/index.mjs";
+import { ChatCompletionRequestMessage } from "openai";
 import EmptyState from "@/components/EmptyState";
 import Loader from "@/components/Loader";
 import { cn } from "@/lib/utils";
 import UserAvatar from "@/components/UserAvatar";
 import BotAvatar from "@/components/BotAvatar";
+import { useProModal } from "@/hooks/pro-modal";
+import toast from "react-hot-toast";
 const ConversationPage = () => {
   const router = useRouter();
-  const [messages, setMessages] = useState<
-    CreateChatCompletionRequestMessage[]
-  >([]);
+  const proModal = useProModal();
+  const [messages, setMessages] = useState<ChatCompletionRequestMessage[]>([]);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -35,7 +32,7 @@ const ConversationPage = () => {
   const isLoading = form.formState.isSubmitting;
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      const userMessage: CreateChatCompletionRequestMessage = {
+      const userMessage: ChatCompletionRequestMessage = {
         role: "user",
         content: values.prompt,
       };
@@ -43,10 +40,15 @@ const ConversationPage = () => {
       const response = await axios.post("/api/conversation", {
         messages: newMessages,
       });
+
       setMessages((current) => [...current, userMessage, response.data]);
       form.reset();
-    } catch (error) {
-      console.log(error);
+    } catch (error: any) {
+      if (error?.response?.status === 403) {
+        proModal.onOpen();
+      } else {
+        toast.error("Something went wrong.");
+      }
     } finally {
       router.refresh();
     }
